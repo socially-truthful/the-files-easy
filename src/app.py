@@ -1,5 +1,7 @@
 import os
 import json
+import re
+import html
 import webbrowser
 import threading
 from pathlib import Path
@@ -163,7 +165,9 @@ def get_document_content(pdf_path):
             has_hidden_content = True
             recovered = page.get("recovered_text", "")
             if recovered:
-                all_recovered_text.append(f"Page {page.get('page_num', '?')}: {recovered}")
+                cleaned = clean_recovered_text(recovered)
+                if cleaned:
+                    all_recovered_text.append(f"Page {page.get('page_num', '?')}: {cleaned}")
     
     file_type = list(file_types)[0] if file_types else pages[0].get("file_type", "document")
     
@@ -567,6 +571,32 @@ def api_hybrid_status():
         "labels_file_exists": os.path.exists(LABELS_FILE)
     })
 
+def clean_pdf_garbage(text):
+    text = re.sub(r'&#x([0-9a-fA-F]+);?0*\1', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'&#x[0-9a-fA-F]+;?', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'&#\d+;?', '', text)
+    text = html.unescape(text)
+    return text
+
+def clean_recovered_text(text):
+    text = clean_pdf_garbage(text)
+    text = re.sub(r'[^\x20-\x7E\n\r\t]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+@app.route('/api/translate', methods=['POST'])
+def api_translate():
+    data = request.get_json() or {}
+    text = data.get('text', '')
+    if not text:
+        return jsonify({'error': 'No text provided', 'cleaned': ''})
+    
+    cleaned = clean_recovered_text(text)
+    return jsonify({
+        'original': text,
+        'cleaned': cleaned
+    })
+
 def open_browser():
     threading.Timer(1.5, lambda: webbrowser.open('http://localhost:5000')).start()
 
@@ -578,5 +608,7 @@ if __name__ == '__main__':
     print(f"Starting server at http://localhost:5000")
     print("=" * 60)
     
-    open_browser()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        open_browser()
+    
+    app.run(debug=True, use_reloader=True, host='0.0.0.0', port=5000)
