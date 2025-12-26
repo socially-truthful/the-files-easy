@@ -60,6 +60,7 @@ python src/main.py live
 ## Examples
 ![alt text](image.png)
 ![alt text](image-1.png)
+<img width="711" height="778" alt="image" src="https://github.com/user-attachments/assets/dbec64cf-b154-4b7a-858a-b5f6e2761522" />
 
 ## Data Source
 
