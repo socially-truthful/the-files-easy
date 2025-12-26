@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gallery - DOJ Epstein Files</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+        .media-card {
+            aspect-ratio: 4/3;
+            overflow: hidden;
+            position: relative;
+            background: #1f2937;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .media-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+        .media-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .media-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+            padding: 1rem;
+            padding-top: 2rem;
+        }
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .lightbox.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .lightbox-content {
+            max-width: 90vw;
+            max-height: 90vh;
+            position: relative;
+        }
+        .lightbox-content img,
+        .lightbox-content iframe {
+            max-width: 90vw;
+            max-height: 85vh;
+            object-fit: contain;
+        }
+        .filter-btn {
+            transition: all 0.2s;
+        }
+        .filter-btn.active {
+            background: #7c3aed;
+            color: white;
+        }
+        .video-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            border-radius: 50%;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 sticky top-0 z-50">
+        <div class="px-4 py-3">
+            <div class="flex items-center justify-between">
+                <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i data-lucide="image" class="w-6 h-6 text-purple-400"></i>
+                    Media Gallery
+                </h1>
+                <div class="flex items-center gap-4">
+                    <a href="/" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
+                        <i data-lucide="folder-open" class="w-4 h-4 text-yellow-400"></i>
+                        Files
+                    </a>
+                    <a href="/graph" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
+                        <i data-lucide="git-branch" class="w-4 h-4 text-purple-400"></i>
+                        Graph
+                    </a>
+                    <a href="/chat" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
+                        <i data-lucide="bot" class="w-4 h-4"></i>
+                        Ask AI
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Filter Bar -->
+    <div class="bg-gray-800/50 border-b border-gray-700 px-4 py-3">
+        <div class="flex items-center gap-4">
+            <span class="text-sm text-gray-400">Filter:</span>
+            <div class="flex gap-2">
+                <button class="filter-btn active px-4 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-gray-600" data-filter="all">
+                    All Media
+                </button>
+                <button class="filter-btn px-4 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-gray-600" data-filter="photograph">
+                    <i data-lucide="image" class="w-4 h-4 inline mr-1"></i>
+                    Photos
+                </button>
+                <button class="filter-btn px-4 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-gray-600" data-filter="video">
+                    <i data-lucide="video" class="w-4 h-4 inline mr-1"></i>
+                    Videos
+                </button>
+                <button class="filter-btn px-4 py-1.5 rounded-full text-sm bg-gray-700 hover:bg-gray-600" data-filter="audio">
+                    <i data-lucide="music" class="w-4 h-4 inline mr-1"></i>
+                    Audio
+                </button>
+            </div>
+            <div class="ml-auto flex items-center gap-2">
+                <select id="sourceSelect" class="px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="all">All Sources</option>
+                </select>
+                <span id="mediaCount" class="text-sm text-gray-400">0 items</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gallery Grid -->
+    <main class="flex-1 p-4 overflow-auto">
+        <div id="galleryGrid" class="gallery-grid">
+            <!-- Loading -->
+            <div class="col-span-full text-center py-16 text-gray-500">
+                <i data-lucide="loader-2" class="w-12 h-12 mx-auto mb-4 animate-spin"></i>
+                <p>Loading media...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Lightbox -->
+    <div id="lightbox" class="lightbox" onclick="closeLightbox(event)">
+        <button onclick="closeLightbox(event)" class="absolute top-4 right-4 p-2 bg-gray-800/80 hover:bg-gray-700 rounded-full transition-colors z-10">
+            <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+        <button id="prevBtn" onclick="navigateMedia(-1, event)" class="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-gray-800/80 hover:bg-gray-700 rounded-full transition-colors z-10">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        <button id="nextBtn" onclick="navigateMedia(1, event)" class="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-gray-800/80 hover:bg-gray-700 rounded-full transition-colors z-10">
+            <i data-lucide="chevron-right" class="w-6 h-6"></i>
+        </button>
+        <div class="lightbox-content">
+            <div id="lightboxMedia"></div>
+            <div id="lightboxInfo" class="mt-4 text-center">
+                <h3 id="lightboxTitle" class="text-lg font-medium"></h3>
+                <p id="lightboxDetails" class="text-sm text-gray-400 mt-1"></p>
+                <a id="lightboxLink" href="#" target="_blank" class="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm transition-colors">
+                    <i data-lucide="external-link" class="w-4 h-4"></i>
+                    Open Document
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let allMedia = [];
+        let sourceList = [];
+        let sourceData = {};
+        let filteredMedia = [];
+        let currentFilter = 'all';
+        let currentSource = 'all';
+        let currentIndex = 0;
+
+        async function init() {
+            await loadMedia();
+            setupFilters();
+        }
+
+        async function loadMedia() {
+            try {
+                const res = await fetch('/api/gallery');
+                const data = await res.json();
+                allMedia = data.items || [];
+                sourceList = data.source_list || [];
+                sourceData = data.sources || {};
+                renderSourceTabs();
+                applyFilter(currentFilter);
+            } catch (e) {
+                console.error('Failed to load media:', e);
+                document.getElementById('galleryGrid').innerHTML = `
+                    <div class="col-span-full text-center py-16 text-red-400">
+                        <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-4"></i>
+                        <p>Failed to load media</p>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        }
+
+        function setupFilters() {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentFilter = btn.dataset.filter;
+                    applyFilter(currentFilter);
+                });
+            });
+            
+            document.getElementById('sourceSelect').addEventListener('change', (e) => {
+                currentSource = e.target.value;
+                applyFilter(currentFilter);
+            });
+        }
+        
+        function renderSourceTabs() {
+            const select = document.getElementById('sourceSelect');
+            select.innerHTML = '<option value="all">All Sources (' + allMedia.length + ')</option>' +
+                sourceList.map(src => {
+                    const count = sourceData[src] ? sourceData[src].length : 0;
+                    return `<option value="${escapeHtml(src)}">${escapeHtml(src)} (${count})</option>`;
+                }).join('');
+        }
+
+        function applyFilter(filter) {
+            let result = allMedia;
+            
+            // Filter by source
+            if (currentSource !== 'all') {
+                result = result.filter(item => item.source === currentSource);
+            }
+            
+            // Filter by type
+            if (filter !== 'all') {
+                result = result.filter(item => item.type === filter);
+            }
+            
+            filteredMedia = result;
+            renderGallery();
+        }
+
+        function renderGallery() {
+            const container = document.getElementById('galleryGrid');
+            document.getElementById('mediaCount').textContent = `${filteredMedia.length} items`;
+
+            if (!filteredMedia.length) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-16 text-gray-500">
+                        <i data-lucide="image-off" class="w-16 h-16 mx-auto mb-4 opacity-30"></i>
+                        <p class="text-lg">No media found</p>
+                        <p class="text-sm mt-2">Try changing the filter</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            // Group by source for display
+            const grouped = {};
+            filteredMedia.forEach((item, idx) => {
+                const src = item.source || 'Unknown';
+                if (!grouped[src]) grouped[src] = [];
+                grouped[src].push({...item, globalIndex: idx});
+            });
+            
+            const sources = Object.keys(grouped).sort();
+            
+            container.innerHTML = sources.map(source => `
+                <div class="col-span-full mt-6 first:mt-0">
+                    <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-700">
+                        <i data-lucide="folder" class="w-5 h-5 text-yellow-400"></i>
+                        <h2 class="text-lg font-semibold text-white">${escapeHtml(source)}</h2>
+                        <span class="text-sm text-gray-500">(${grouped[source].length} items)</span>
+                    </div>
+                </div>
+                ${grouped[source].map(item => `
+                    <div class="media-card" onclick="openLightbox(${item.globalIndex})">
+                        ${item.type === 'video' ? `
+                            <div class="w-full h-full bg-gray-800 flex items-center justify-center">
+                                <div class="video-icon">
+                                    <i data-lucide="play" class="w-8 h-8 text-white"></i>
+                                </div>
+                            </div>
+                        ` : item.type === 'audio' ? `
+                            <div class="w-full h-full bg-gradient-to-br from-purple-900 to-indigo-900 flex items-center justify-center">
+                                <div class="video-icon">
+                                    <i data-lucide="music" class="w-8 h-8 text-white"></i>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="w-full h-full bg-gray-800 flex items-center justify-center">
+                                <i data-lucide="file-image" class="w-12 h-12 text-gray-600"></i>
+                            </div>
+                        `}
+                        <div class="media-overlay">
+                            <p class="text-sm font-medium truncate">${escapeHtml(item.filename)}</p>
+                            <p class="text-xs text-gray-400 mt-1">${item.type === 'video' ? 'Video' : item.type === 'audio' ? 'Audio' : 'Photo'} • Page ${item.page || 1}</p>
+                        </div>
+                    </div>
+                `).join('')}
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function openLightbox(index) {
+            currentIndex = index;
+            const item = filteredMedia[index];
+            const lightbox = document.getElementById('lightbox');
+            const mediaContainer = document.getElementById('lightboxMedia');
+            
+            // Show PDF page in iframe
+            mediaContainer.innerHTML = `
+                <iframe src="/api/pdf?path=${encodeURIComponent(item.pdf_path)}#page=${item.page || 1}" 
+                        class="bg-white rounded-lg" 
+                        style="width: 80vw; height: 75vh;"></iframe>
+            `;
+            
+            document.getElementById('lightboxTitle').textContent = item.filename;
+            document.getElementById('lightboxDetails').textContent = `${item.source || 'Unknown'} • ${item.type === 'video' ? 'Video' : item.type === 'audio' ? 'Audio' : 'Photo'} • Page ${item.page || 1}`;
+            document.getElementById('lightboxLink').href = `/?doc=${encodeURIComponent(item.pdf_path)}`;
+            
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            lucide.createIcons();
+        }
+
+        function closeLightbox(event) {
+            if (event.target === document.getElementById('lightbox') || event.currentTarget.tagName === 'BUTTON') {
+                document.getElementById('lightbox').classList.remove('active');
+                document.body.style.overflow = '';
+                document.getElementById('lightboxMedia').innerHTML = '';
+            }
+        }
+
+        function navigateMedia(direction, event) {
+            event.stopPropagation();
+            currentIndex = (currentIndex + direction + filteredMedia.length) % filteredMedia.length;
+            openLightbox(currentIndex);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (!document.getElementById('lightbox').classList.contains('active')) return;
+            if (e.key === 'Escape') closeLightbox({ target: document.getElementById('lightbox') });
+            if (e.key === 'ArrowLeft') navigateMedia(-1, e);
+            if (e.key === 'ArrowRight') navigateMedia(1, e);
+        });
+
+        init();
+    </script>
+</body>
+</html>

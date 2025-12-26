@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOJ Epstein Files Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .content-viewer {
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+        .folder-tree {
+            max-height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+        .file-list {
+            max-height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+        .folder-item:hover { background-color: rgba(59, 130, 246, 0.1); }
+        .folder-item.active { background-color: rgba(59, 130, 246, 0.2); border-left: 3px solid #3b82f6; }
+        .file-item:hover { background-color: rgba(147, 51, 234, 0.1); }
+        .file-item.active { background-color: rgba(147, 51, 234, 0.2); }
+        .hidden-content-badge { 
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            animation: pulse-glow 2s infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.8); }
+        }
+        .recovered-text-box {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(245, 158, 11, 0.1));
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-left: 4px solid #ef4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 sticky top-0 z-50">
+        <div class="px-4 py-3">
+            <div class="flex items-center justify-between">
+                <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i data-lucide="folder-open" class="w-6 h-6 text-yellow-400"></i>
+                    DOJ Epstein Files
+                </h1>
+                <div class="flex items-center gap-4">
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="Search all files..."
+                            class="pl-9 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                        >
+                    </div>
+                    <a href="/gallery" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
+                        <i data-lucide="image" class="w-4 h-4 text-pink-400"></i>
+                        Gallery
+                    </a>
+                    <a href="/graph" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
+                        <i data-lucide="git-branch" class="w-4 h-4 text-purple-400"></i>
+                        Graph
+                    </a>
+                    <a href="/chat" id="aiLink" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
+                        <i data-lucide="bot" class="w-4 h-4"></i>
+                        Ask AI
+                    </a>
+                    <div id="stats" class="text-sm text-gray-400"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main 3-Column Layout -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Left: Topic Folders -->
+        <div class="w-64 bg-gray-850 border-r border-gray-700 flex flex-col" style="background-color: #1a1f2e;">
+            <div class="p-3 border-b border-gray-700">
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+                    Topics
+                </h2>
+            </div>
+            <div id="folderTree" class="folder-tree flex-1">
+                <!-- Folders loaded here -->
+            </div>
+        </div>
+
+        <!-- Middle: File List -->
+        <div class="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
+            <div class="p-3 border-b border-gray-700 flex items-center justify-between">
+                <h2 id="currentFolder" class="text-sm font-semibold text-gray-300">
+                    All Documents
+                </h2>
+                <span id="fileCount" class="text-xs text-gray-500 bg-gray-700 px-2 py-0.5 rounded">0</span>
+            </div>
+            <div id="fileList" class="file-list flex-1">
+                <div class="p-4 text-center text-gray-500 text-sm">
+                    <p>Select a topic</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Document Viewer -->
+        <div class="flex-1 bg-gray-900 flex flex-col">
+            <div class="p-3 border-b border-gray-700 flex items-center justify-between">
+                <div class="flex items-center gap-2 min-w-0">
+                    <i data-lucide="file-text" class="w-4 h-4 text-purple-400 flex-shrink-0"></i>
+                    <span id="docTitle" class="text-sm font-medium truncate">No document selected</span>
+                </div>
+                <div id="docTopics" class="flex gap-1 flex-shrink-0"></div>
+            </div>
+            <div id="documentContent" class="flex-1 p-4 content-viewer font-mono text-sm leading-relaxed whitespace-pre-wrap overflow-auto">
+                <div class="text-center text-gray-500 py-16">
+                    <i data-lucide="file-text" class="w-16 h-16 mx-auto mb-4 opacity-20"></i>
+                    <p class="text-lg">Select a document to view</p>
+                    <p class="text-sm mt-2 text-gray-600">Browse topics on the left, then select a file</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // State
+        let topicsData = {};
+        let currentTopic = null;
+        let currentDoc = null;
+
+
+        async function init() {
+            await loadStats();
+            await loadFolders();
+            await checkAI();
+        }
+
+        async function checkAI() {
+            try {
+                const res = await fetch('/api/ai/status');
+                const data = await res.json();
+                // Show AI link if Ollama is available (even if RAG not ready yet)
+                if (data.available || data.ollama_available) {
+                    document.getElementById('aiLink').classList.remove('hidden');
+                    document.getElementById('aiLink').classList.add('flex');
+                }
+            } catch (e) {
+                // Still show AI link - let chat page handle availability
+                document.getElementById('aiLink').classList.remove('hidden');
+                document.getElementById('aiLink').classList.add('flex');
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                topicsData = data.topics || {};
+                document.getElementById('stats').innerHTML = `<strong>${data.total_documents}</strong> docs`;
+            } catch (e) {}
+        }
+
+        async function loadFolders() {
+            try {
+                const res = await fetch('/api/topics');
+                const data = await res.json();
+                const container = document.getElementById('folderTree');
+                
+                // Sort topics by document count
+                const sortedTopics = data.topics.sort((a, b) => 
+                    (topicsData[b] || 0) - (topicsData[a] || 0)
+                );
+
+                container.innerHTML = `
+                    <div class="folder-item px-3 py-2 cursor-pointer flex items-center text-sm ${!currentTopic ? 'active' : ''}" onclick="showAllFiles()">
+                        <span class="flex-1">All Documents</span>
+                        <span class="text-xs text-gray-500">${Object.values(topicsData).reduce((a,b) => a+b, 0) || '?'}</span>
+                    </div>
+                    <div class="border-t border-gray-700 my-1"></div>
+                    ${sortedTopics.map(topic => {
+                        const count = topicsData[topic] || 0;
+                        return `
+                            <div class="folder-item px-3 py-2 cursor-pointer flex items-center text-sm" 
+                                 onclick="selectFolder('${topic}')" data-topic="${topic}">
+                                <span class="flex-1 truncate">${topic.replace(/_/g, ' ')}</span>
+                                <span class="text-xs text-gray-500">${count}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                `;
+                lucide.createIcons();
+            } catch (e) {
+                console.error('Failed to load folders:', e);
+            }
+        }
+
+        async function showAllFiles() {
+            currentTopic = null;
+            updateFolderSelection();
+            document.getElementById('currentFolder').textContent = 'All Documents';
+            
+            try {
+                const res = await fetch('/api/search?q=*');
+                const data = await res.json();
+                displayFiles(data.results || []);
+            } catch (e) {}
+            lucide.createIcons();
+        }
+
+        async function selectFolder(topic) {
+            currentTopic = topic;
+            updateFolderSelection();
+            
+            document.getElementById('currentFolder').textContent = topic.replace(/_/g, ' ');
+            
+            try {
+                const res = await fetch(`/api/browse/${topic}`);
+                const data = await res.json();
+                displayFiles(data.results || []);
+            } catch (e) {
+                console.error('Failed to load topic:', e);
+            }
+            lucide.createIcons();
+        }
+
+        function updateFolderSelection() {
+            document.querySelectorAll('.folder-item').forEach(el => {
+                el.classList.remove('active');
+                if (el.dataset.topic === currentTopic || (!currentTopic && !el.dataset.topic)) {
+                    el.classList.add('active');
+                }
+            });
+        }
+
+        function displayFiles(files) {
+            const container = document.getElementById('fileList');
+            document.getElementById('fileCount').textContent = files.length;
+
+            if (!files.length) {
+                container.innerHTML = `
+                    <div class="p-4 text-center text-gray-500 text-sm">
+                        <i data-lucide="file-x" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>
+                        <p>No documents</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = files.map(doc => `
+                <div class="file-item px-3 py-2 cursor-pointer border-b border-gray-700/50" 
+                     onclick="loadDocument('${encodeURIComponent(doc.path)}')" data-path="${doc.path}">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="file-text" class="w-4 h-4 text-gray-500 flex-shrink-0"></i>
+                        <span class="text-sm text-gray-200 truncate flex-1">${doc.filename}</span>
+                        ${doc.has_hidden_content ? '<span class="hidden-content-badge text-xs px-1.5 py-0.5 rounded text-white font-bold" title="Contains recovered redacted text">UNREDACTED</span>' : ''}
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        async function loadDocument(encodedPath) {
+            const path = decodeURIComponent(encodedPath);
+            currentDoc = path;
+            
+            // Update file selection
+            document.querySelectorAll('.file-item').forEach(el => {
+                el.classList.remove('active');
+                if (el.dataset.path === path) el.classList.add('active');
+            });
+
+            try {
+                const res = await fetch(`/api/document?path=${encodedPath}`);
+                const data = await res.json();
+                
+                if (data.error) {
+                    document.getElementById('documentContent').innerHTML = `
+                        <div class="text-red-400 p-4">Error: ${data.error}</div>
+                    `;
+                    return;
+                }
+
+                document.getElementById('docTitle').textContent = data.filename;
+                
+                // Build recovered text banner if applicable
+                let recoveredBanner = '';
+                if (data.has_hidden_content && data.recovered_text) {
+                    recoveredBanner = `
+                        <div class="recovered-text-box rounded-lg p-4 mb-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i data-lucide="eye-off" class="w-5 h-5 text-red-400"></i>
+                                <span class="text-red-400 font-bold text-sm uppercase">Recovered from Improper Redactions</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">The following text was hidden under redaction bars but recovered from the PDF structure:</p>
+                            <div class="bg-black/30 rounded p-3 font-mono text-sm text-yellow-200 whitespace-pre-wrap">${escapeHtml(data.recovered_text)}</div>
+                        </div>
+                    `;
+                }
+                
+                // Show PDF if path is a PDF file
+                const isPdf = data.pdf_path || (data.path && data.path.endsWith('.pdf'));
+                const pdfPath = data.pdf_path || data.path;
+                
+                if (isPdf && pdfPath) {
+                    document.getElementById('documentContent').innerHTML = `
+                        ${recoveredBanner}
+                        <iframe src="/api/pdf?path=${encodeURIComponent(pdfPath)}" 
+                                class="w-full h-full border-0" 
+                                style="min-height: calc(100vh - 200px);"></iframe>
+                    `;
+                } else if (data.content) {
+                    const lines = data.content.split('\n');
+                    const formatted = lines.map((line, i) => 
+                        `<span class="text-gray-600 select-none text-xs">${String(i + 1).padStart(4, ' ')}</span> ${escapeHtml(line)}`
+                    ).join('\n');
+                    document.getElementById('documentContent').innerHTML = `${recoveredBanner}<pre class="whitespace-pre-wrap">${formatted}</pre>`;
+                } else {
+                    document.getElementById('documentContent').innerHTML = `
+                        ${recoveredBanner}
+                        <div class="text-gray-500 p-4">No content available for this document.</div>
+                    `;
+                }
+                lucide.createIcons();
+            } catch (e) {
+                console.error('Failed to load document:', e);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Search
+        document.getElementById('searchInput').addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                const query = e.target.value.trim();
+                if (!query) return;
+                
+                currentTopic = null;
+                updateFolderSelection();
+                document.getElementById('currentFolder').innerHTML = `
+                    <i data-lucide="search" class="w-4 h-4"></i> Search: "${query}"
+                `;
+                
+                try {
+                    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                    const data = await res.json();
+                    displayFiles(data.results || []);
+                } catch (e) {}
+                lucide.createIcons();
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>
